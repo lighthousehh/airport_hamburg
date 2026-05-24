@@ -6,5 +6,5 @@ logger:
     custom_components.airport_hamburg: debug
 lovelace:
   resources:
-    - url: /local/flex-table-card/flex-table-card.js
+    - url: https://cdn.jsdelivr.net/gh/custom-cards/flex-table-card@master/flex-table-card.js
       type: module
