@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -16,6 +17,25 @@ from .const import DOMAIN, API_BASE_URL, DEFAULT_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR]
+HAM_TZ = ZoneInfo("Europe/Berlin")
+
+
+def _parse_time(t: str | None) -> datetime | None:
+    if not t:
+        return None
+    try:
+        return datetime.fromisoformat(t.split("[")[0])
+    except Exception:
+        return None
+
+
+def _fmt(t: str | None) -> str | None:
+    if not t:
+        return None
+    try:
+        return t.split("[")[0][11:16]
+    except Exception:
+        return t
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -64,7 +84,6 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
                     raise UpdateFailed("Zugriff verweigert (403)")
                 if response.status != 200:
                     raise UpdateFailed(f"HTTP {response.status}")
-                # Manuell parsen – API liefert keinen application/json Content-Type
                 text = await response.text()
                 data = json.loads(text)
         except json.JSONDecodeError as err:
@@ -75,19 +94,55 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
 
     def _process_arrivals(self, raw_data) -> dict:
         arrivals = raw_data if isinstance(raw_data, list) else raw_data.get("arrivals", [])
-        processed = [{
-            "flight_number":   f.get("flightnumber", ""),
-            "origin_iata":     f.get("originAirport3LCode", ""),
-            "origin_name":     f.get("originAirportName", ""),
-            "origin_name_int": f.get("originAirportNameInt", ""),
-            "planned_arrival": f.get("plannedArrivalTime", ""),
-            "expected_arrival":f.get("expectedArrivalTime"),
-            "terminal":        f.get("arrivalTerminal", ""),
-            "status":          f.get("flightStatusArrival", ""),
-            "via_airport":     f.get("viaAirportName"),
-        } for f in arrivals]
+        now = datetime.now(tz=HAM_TZ)
+
+        # Alle Flüge parsen und mit Referenzzeit versehen
+        all_flights = []
+        for f in arrivals:
+            ref_time = _parse_time(f.get("expectedArrivalTime")) or \
+                       _parse_time(f.get("plannedArrivalTime"))
+            if ref_time is None:
+                continue
+            all_flights.append({
+                "flight_number":    f.get("flightnumber", ""),
+                "origin_iata":      f.get("originAirport3LCode", ""),
+                "origin_name":      f.get("originAirportName", ""),
+                "origin_name_int":  f.get("originAirportNameInt", ""),
+                "planned_arrival":  _fmt(f.get("plannedArrivalTime")),
+                "expected_arrival": _fmt(f.get("expectedArrivalTime")),
+                "terminal":         f.get("arrivalTerminal", ""),
+                "status":           f.get("flightStatusArrival", ""),
+                "via_airport":      f.get("viaAirportName"),
+                "_ref_time":        ref_time.astimezone(HAM_TZ),
+            })
+
+        # Nach Referenzzeit sortieren
+        all_flights.sort(key=lambda x: x["_ref_time"])
+
+        # In vergangene und zukünftige aufteilen
+        past    = [f for f in all_flights if f["_ref_time"] < now]
+        future  = [f for f in all_flights if f["_ref_time"] >= now]
+
+        # Letzte 2 vergangene + nächste 2 kommende
+        window = past[-2:] + future[:2]
+
+        # Internes Sortierfeld entfernen
+        for f in window:
+            del f["_ref_time"]
+
+        next_arrival = future[0] if future else {}
+        if next_arrival:
+            next_arrival = dict(next_arrival)
+
+        _LOGGER.debug(
+            "HAM: %d vergangen, %d kommend – Fenster: %s",
+            len(past), len(future),
+            [f["flight_number"] for f in window]
+        )
+
         return {
-            "arrivals":     processed,
-            "total_count":  len(processed),
-            "next_arrival": processed[0] if processed else {},
+            "window":       window,       # 2 vergangene + 2 kommende
+            "next_arrival": next_arrival, # nächster Flug für Einzel-Sensoren
+            "past_count":   len(past),
+            "future_count": len(future),
         }
