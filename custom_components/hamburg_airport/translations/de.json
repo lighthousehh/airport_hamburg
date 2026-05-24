@@ -21,7 +21,9 @@
       "init": {
         "title": "Hamburg Airport Optionen",
         "data": {
-          "scan_interval": "Aktualisierungsintervall (Minuten)"
+          "scan_interval": "Aktualisierungsintervall (Minuten)",
+          "past_count": "Anzahl vergangener Landungen (0–10)",
+          "future_count": "Anzahl kommender Landungen (1–10)"
         }
       }
     }

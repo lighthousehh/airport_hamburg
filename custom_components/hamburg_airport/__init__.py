@@ -13,7 +13,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, API_BASE_URL, DEFAULT_SCAN_INTERVAL
+from .const import (
+    DOMAIN, API_BASE_URL,
+    DEFAULT_SCAN_INTERVAL, DEFAULT_PAST_COUNT, DEFAULT_FUTURE_COUNT,
+    CONF_SCAN_INTERVAL, CONF_PAST_COUNT, CONF_FUTURE_COUNT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR]
@@ -39,9 +43,11 @@ def _fmt(t: str | None) -> str | None:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    api_key = entry.data["api_key"]
-    scan_interval = entry.options.get("scan_interval", DEFAULT_SCAN_INTERVAL)
-    coordinator = HamburgAirportDataCoordinator(hass, api_key, scan_interval)
+    scan_interval  = entry.options.get(CONF_SCAN_INTERVAL,  DEFAULT_SCAN_INTERVAL)
+    past_count     = entry.options.get(CONF_PAST_COUNT,     DEFAULT_PAST_COUNT)
+    future_count   = entry.options.get(CONF_FUTURE_COUNT,   DEFAULT_FUTURE_COUNT)
+    coordinator = HamburgAirportDataCoordinator(
+        hass, entry.data["api_key"], scan_interval, past_count, future_count)
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
@@ -61,10 +67,12 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 class HamburgAirportDataCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, api_key, scan_interval):
+    def __init__(self, hass, api_key, scan_interval, past_count, future_count):
         super().__init__(hass, _LOGGER, name=DOMAIN,
                          update_interval=timedelta(minutes=scan_interval))
-        self.api_key = api_key
+        self.api_key      = api_key
+        self.past_count   = past_count
+        self.future_count = future_count
 
     async def _async_update_data(self) -> dict:
         session = async_get_clientsession(self.hass)
@@ -84,8 +92,7 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
                     raise UpdateFailed("Zugriff verweigert (403)")
                 if response.status != 200:
                     raise UpdateFailed(f"HTTP {response.status}")
-                text = await response.text()
-                data = json.loads(text)
+                data = json.loads(await response.text())
         except json.JSONDecodeError as err:
             raise UpdateFailed(f"Ungültiges JSON: {err}") from err
         except aiohttp.ClientError as err:
@@ -96,7 +103,6 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
         arrivals = raw_data if isinstance(raw_data, list) else raw_data.get("arrivals", [])
         now = datetime.now(tz=HAM_TZ)
 
-        # Alle Flüge parsen und mit Referenzzeit versehen
         all_flights = []
         for f in arrivals:
             ref_time = _parse_time(f.get("expectedArrivalTime")) or \
@@ -116,33 +122,33 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
                 "_ref_time":        ref_time.astimezone(HAM_TZ),
             })
 
-        # Nach Referenzzeit sortieren
         all_flights.sort(key=lambda x: x["_ref_time"])
 
-        # In vergangene und zukünftige aufteilen
-        past    = [f for f in all_flights if f["_ref_time"] < now]
-        future  = [f for f in all_flights if f["_ref_time"] >= now]
+        past   = [f for f in all_flights if f["_ref_time"] < now]
+        future = [f for f in all_flights if f["_ref_time"] >= now]
 
-        # Letzte 2 vergangene + nächste 2 kommende
-        window = past[-2:] + future[:2]
+        # Konfigurierbare Anzahl
+        window = past[-self.past_count:] + future[:self.future_count] \
+                 if self.past_count > 0 else future[:self.future_count]
 
-        # Internes Sortierfeld entfernen
         for f in window:
             del f["_ref_time"]
 
-        next_arrival = future[0] if future else {}
-        if next_arrival:
-            next_arrival = dict(next_arrival)
+        next_arrival = dict(future[0]) if future else {}
+        if "_ref_time" in next_arrival:
+            del next_arrival["_ref_time"]
 
         _LOGGER.debug(
-            "HAM: %d vergangen, %d kommend – Fenster: %s",
-            len(past), len(future),
-            [f["flight_number"] for f in window]
+            "HAM: Fenster=%d (-%d/+%d), nächster: %s",
+            len(window), self.past_count, self.future_count,
+            next_arrival.get("flight_number", "–"),
         )
 
         return {
-            "window":       window,       # 2 vergangene + 2 kommende
-            "next_arrival": next_arrival, # nächster Flug für Einzel-Sensoren
-            "past_count":   len(past),
-            "future_count": len(future),
+            "window":        window,
+            "next_arrival":  next_arrival,
+            "past_count":    len(past),
+            "future_count":  len(future),
+            "window_past":   self.past_count,
+            "window_future": self.future_count,
         }

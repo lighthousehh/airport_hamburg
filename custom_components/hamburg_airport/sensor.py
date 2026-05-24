@@ -1,7 +1,6 @@
 """Sensor-Plattform für Hamburg Airport."""
 from __future__ import annotations
 
-import json
 import logging
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -13,7 +12,6 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Einzel-Sensoren für den nächsten Flug
 NEXT_SENSORS = (
     SensorEntityDescription(key="next_flight_number", name="Nächste Landung Flugnummer",     icon="mdi:airplane"),
     SensorEntityDescription(key="next_origin",        name="Nächste Landung Herkunft",       icon="mdi:map-marker"),
@@ -25,7 +23,6 @@ NEXT_SENSORS = (
     SensorEntityDescription(key="next_via",           name="Nächste Landung Via",            icon="mdi:transit-connection"),
 )
 
-# Fenster-Sensor (2 vergangene + 2 kommende als JSON + Attribute)
 WINDOW_SENSOR = SensorEntityDescription(
     key="window",
     name="Landungen Zeitfenster",
@@ -46,7 +43,6 @@ async def async_setup_entry(
 
 
 class HamburgAirportNextSensor(CoordinatorEntity, SensorEntity):
-    """Einzel-Sensor für den nächsten Flug."""
     _attr_has_entity_name = True
 
     def __init__(self, coordinator, description, entry_id):
@@ -79,7 +75,6 @@ class HamburgAirportNextSensor(CoordinatorEntity, SensorEntity):
 
 
 class HamburgAirportWindowSensor(CoordinatorEntity, SensorEntity):
-    """Sensor mit den letzten 2 + nächsten 2 Landungen als Attribute."""
     _attr_has_entity_name = True
 
     def __init__(self, coordinator, description, entry_id):
@@ -108,14 +103,29 @@ class HamburgAirportWindowSensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self):
         if not self.coordinator.data:
             return None
-        window = self.coordinator.data.get("window", [])
+        d = self.coordinator.data
+        window       = d.get("window", [])
+        window_past  = d.get("window_past", 0)
+        window_future= d.get("window_future", 2)
+
         attrs = {
-            "past_count":   self.coordinator.data.get("past_count", 0),
-            "future_count": self.coordinator.data.get("future_count", 0),
+            "past_count":    d.get("past_count", 0),
+            "future_count":  d.get("future_count", 0),
+            "window_past":   window_past,
+            "window_future": window_future,
         }
-        labels = ["last_2", "last_1", "next_1", "next_2"]
+
+        # Dynamische Labels: past_N (ältester zuerst) → future_N
         for i, flight in enumerate(window):
-            label = labels[i] if i < len(labels) else f"slot_{i}"
+            past_slots = min(window_past, len([f for f in window]))
+            if i < window_past:
+                # vergangene: past_2, past_1 (past_1 = zuletzt gelandet)
+                slot_num = window_past - i
+                label = f"past_{slot_num}"
+            else:
+                # zukünftige: future_1, future_2, ...
+                label = f"future_{i - window_past + 1}"
+
             attrs.update({
                 f"{label}_number":   flight.get("flight_number", ""),
                 f"{label}_origin":   flight.get("origin_name_int") or flight.get("origin_name", ""),

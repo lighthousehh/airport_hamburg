@@ -9,7 +9,11 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, API_BASE_URL, DEFAULT_SCAN_INTERVAL, CONF_API_KEY, CONF_SCAN_INTERVAL
+from .const import (
+    DOMAIN, API_BASE_URL,
+    DEFAULT_SCAN_INTERVAL, DEFAULT_PAST_COUNT, DEFAULT_FUTURE_COUNT,
+    CONF_API_KEY, CONF_SCAN_INTERVAL, CONF_PAST_COUNT, CONF_FUTURE_COUNT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,11 +67,19 @@ class HamburgAirportOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        cur = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+
+        opts = self.config_entry.options
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Required(CONF_SCAN_INTERVAL, default=cur):
-                    vol.All(vol.Coerce(int), vol.Range(min=1, max=60))
+                vol.Required(CONF_SCAN_INTERVAL,
+                    default=opts.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)):
+                    vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+                vol.Required(CONF_PAST_COUNT,
+                    default=opts.get(CONF_PAST_COUNT, DEFAULT_PAST_COUNT)):
+                    vol.All(vol.Coerce(int), vol.Range(min=0, max=10)),
+                vol.Required(CONF_FUTURE_COUNT,
+                    default=opts.get(CONF_FUTURE_COUNT, DEFAULT_FUTURE_COUNT)):
+                    vol.All(vol.Coerce(int), vol.Range(min=1, max=10)),
             }),
         )
