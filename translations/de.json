@@ -1,0 +1,13 @@
+"config": {
+        "step": {"user": {
+            "title": "Hamburg Airport API einrichten",
+            "description": "API-Schlüssel von https://portal.api.hamburg-airport.de eingeben.",
+            "data": {"api_key": "API-Schlüssel (Ocp-Apim-Subscription-Key)"}
+        }},
+        "error": {"invalid_api_key": "Ungültiger API-Schlüssel."},
+        "abort": {"already_configured": "Hamburg Airport ist bereits konfiguriert."}
+    },
+    "options": {"step": {"init": {
+        "title": "Hamburg Airport Optionen",
+        "data": {"scan_interval": "Aktualisierungsintervall (Minuten)"}
+    }}}

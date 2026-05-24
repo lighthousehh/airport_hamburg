@@ -1,0 +1,12 @@
+{
+  "domain": "hamburg_airport",
+  "name": "Hamburg Airport Arrivals",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://portal.api.hamburg-airport.de",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [],
+  "iot_class": "cloud_polling",
+  "homeassistant": "2024.1.0"
+}
