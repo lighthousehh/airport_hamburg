@@ -1,6 +1,7 @@
 """Hamburg Airport Arrivals – Home Assistant Integration."""
 from __future__ import annotations
 
+import json
 import logging
 from datetime import timedelta
 
@@ -63,7 +64,11 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
                     raise UpdateFailed("Zugriff verweigert (403)")
                 if response.status != 200:
                     raise UpdateFailed(f"HTTP {response.status}")
-                data = await response.json()
+                # Manuell parsen – API liefert keinen application/json Content-Type
+                text = await response.text()
+                data = json.loads(text)
+        except json.JSONDecodeError as err:
+            raise UpdateFailed(f"Ungültiges JSON: {err}") from err
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Verbindungsfehler: {err}") from err
         return self._process_arrivals(data)
@@ -71,18 +76,18 @@ class HamburgAirportDataCoordinator(DataUpdateCoordinator):
     def _process_arrivals(self, raw_data) -> dict:
         arrivals = raw_data if isinstance(raw_data, list) else raw_data.get("arrivals", [])
         processed = [{
-            "flight_number":    f.get("flightnumber", ""),
-            "origin_iata":      f.get("originAirport3LCode", ""),
-            "origin_name":      f.get("originAirportName", ""),
-            "origin_name_int":  f.get("originAirportNameInt", ""),
-            "planned_arrival":  f.get("plannedArrivalTime", ""),
-            "expected_arrival": f.get("expectedArrivalTime"),
-            "terminal":         f.get("arrivalTerminal", ""),
-            "status":           f.get("flightStatusArrival", ""),
-            "via_airport":      f.get("viaAirportName"),
+            "flight_number":   f.get("flightnumber", ""),
+            "origin_iata":     f.get("originAirport3LCode", ""),
+            "origin_name":     f.get("originAirportName", ""),
+            "origin_name_int": f.get("originAirportNameInt", ""),
+            "planned_arrival": f.get("plannedArrivalTime", ""),
+            "expected_arrival":f.get("expectedArrivalTime"),
+            "terminal":        f.get("arrivalTerminal", ""),
+            "status":          f.get("flightStatusArrival", ""),
+            "via_airport":     f.get("viaAirportName"),
         } for f in arrivals]
         return {
-            "arrivals": processed,
-            "total_count": len(processed),
+            "arrivals":     processed,
+            "total_count":  len(processed),
             "next_arrival": processed[0] if processed else {},
         }
