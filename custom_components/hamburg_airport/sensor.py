@@ -1,30 +1,44 @@
-"""Sensor-Plattform: 10 Sensoren für Hamburg Airport Landungsdaten."""
+"""Sensor-Plattform für Hamburg Airport."""
 from __future__ import annotations
-import json, logging
+
+import json
+import logging
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from ... import HamburgAirportDataCoordinator
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 SENSOR_DESCRIPTIONS = (
     SensorEntityDescription(key="total_arrivals",     name="Landungen gesamt",                   icon="mdi:airplane-landing", native_unit_of_measurement="Flüge"),
-    SensorEntityDescription(key="next_flight_number", name="Nächste Landung: Flugnummer",         icon="mdi:airplane"),
-    SensorEntityDescription(key="next_origin",        name="Nächste Landung: Herkunft",           icon="mdi:map-marker"),
-    SensorEntityDescription(key="next_origin_iata",   name="Nächste Landung: IATA-Code Herkunft", icon="mdi:airport"),
-    SensorEntityDescription(key="next_planned_time",  name="Nächste Landung: Planzeit",           icon="mdi:clock-outline"),
-    SensorEntityDescription(key="next_expected_time", name="Nächste Landung: Erwartete Zeit",     icon="mdi:clock-alert-outline"),
-    SensorEntityDescription(key="next_terminal",      name="Nächste Landung: Terminal",           icon="mdi:gate"),
-    SensorEntityDescription(key="next_status",        name="Nächste Landung: Status",             icon="mdi:information-outline"),
-    SensorEntityDescription(key="next_via",           name="Nächste Landung: Via-Flughafen",      icon="mdi:transit-connection"),
-    SensorEntityDescription(key="arrivals_json",      name="Alle Landungen (JSON)",               icon="mdi:format-list-bulleted"),
+    SensorEntityDescription(key="next_flight_number", name="Nächste Landung Flugnummer",          icon="mdi:airplane"),
+    SensorEntityDescription(key="next_origin",        name="Nächste Landung Herkunft",            icon="mdi:map-marker"),
+    SensorEntityDescription(key="next_origin_iata",   name="Nächste Landung IATA-Code",           icon="mdi:airport"),
+    SensorEntityDescription(key="next_planned_time",  name="Nächste Landung Planzeit",            icon="mdi:clock-outline"),
+    SensorEntityDescription(key="next_expected_time", name="Nächste Landung Erwartete Zeit",      icon="mdi:clock-alert-outline"),
+    SensorEntityDescription(key="next_terminal",      name="Nächste Landung Terminal",            icon="mdi:gate"),
+    SensorEntityDescription(key="next_status",        name="Nächste Landung Status",              icon="mdi:information-outline"),
+    SensorEntityDescription(key="next_via",           name="Nächste Landung Via-Flughafen",       icon="mdi:transit-connection"),
+    SensorEntityDescription(key="arrivals_json",      name="Alle Landungen JSON",                 icon="mdi:format-list-bulleted"),
 )
 
-async def async_setup_entry(hass, entry, async_add_entities):
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([HamburgAirportSensor(coordinator, d, entry.entry_id)
-                        for d in SENSOR_DESCRIPTIONS], True)
+    async_add_entities(
+        [HamburgAirportSensor(coordinator, description, entry.entry_id)
+         for description in SENSOR_DESCRIPTIONS],
+        True,
+    )
+
 
 class HamburgAirportSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
@@ -62,7 +76,9 @@ class HamburgAirportSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        if self.entity_description.key != "arrivals_json" or not self.coordinator.data:
+        if self.entity_description.key != "arrivals_json":
+            return None
+        if not self.coordinator.data:
             return None
         arrivals = self.coordinator.data.get("arrivals", [])
         attrs = {"total_count": len(arrivals)}
@@ -81,6 +97,9 @@ class HamburgAirportSensor(CoordinatorEntity, SensorEntity):
 
     @staticmethod
     def _fmt(t):
-        if not t: return None
-        try: return t.split("[")[0][11:16]
-        except: return t
+        if not t:
+            return None
+        try:
+            return t.split("[")[0][11:16]
+        except Exception:
+            return t
