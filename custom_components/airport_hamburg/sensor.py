@@ -3,7 +3,7 @@ from __future__ import annotations
 import json, logging
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from . import HamburgAirportDataCoordinator
+from ... import HamburgAirportDataCoordinator
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)

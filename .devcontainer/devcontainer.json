@@ -1,0 +1,19 @@
+{
+  "name": "Airport Hamburg HA Dev",
+  "image": "ghcr.io/home-assistant/devcontainer:2025.5",
+  "appPort": ["8123"],
+  "mounts": [
+    "source=${localWorkspaceFolder}/custom_components,target=/config/custom_components,type=bind,consistency=cached"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylance",
+        "charliermarsh.ruff",
+        "redhat.vscode-yaml"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}
