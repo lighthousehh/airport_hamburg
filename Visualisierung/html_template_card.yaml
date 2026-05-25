@@ -1,1 +1,65 @@
-
+type: custom:html-template-card
+ignore_line_breaks: true
+content: |
+  {% set s = 'sensor.hamburg_airport_landungen_zeitfenster' %}
+  {% set wp = state_attr(s, 'window_past') | int(0) %}
+  {% set wf = state_attr(s, 'window_future') | int(0) %}
+  <style>
+    .ham { width:100%; border-collapse:collapse; font-size:.9em; font-family: var(--primary-font-family); }
+    .ham th { font-size:.7em; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--secondary-text-color); padding:4px 10px 8px; border-bottom:2px solid var(--divider-color); text-align:left; }
+    .ham td { padding:8px 10px; vertical-align:middle; }
+    .ham .past td { opacity:.4; border-bottom:1px solid var(--divider-color); }
+    .ham .sep td { text-align:center; font-size:.7em; color:var(--secondary-text-color); letter-spacing:.15em; padding:3px 0; background:var(--secondary-background-color); }
+    .ham .next td { font-weight:700; border-top:2px solid var(--success-color,#4caf50); border-bottom:2px solid var(--success-color,#4caf50); background:color-mix(in srgb,var(--success-color,#4caf50) 8%,transparent); }
+    .ham .future td { opacity:.75; border-bottom:1px solid var(--divider-color); }
+    .badge { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.75em; font-weight:700; white-space:nowrap; }
+    .bp { background:var(--divider-color); color:var(--secondary-text-color); }
+    .bn { background:var(--success-color,#4caf50); color:#fff; }
+    .bf { background:var(--primary-color); color:#fff; }
+    .tn { font-variant-numeric:tabular-nums; }
+    .warn { color:var(--warning-color,#ff9800); margin-left:3px; font-size:.8em; }
+  </style>
+  <table class="ham">
+    <thead><tr>
+      <th>Status</th><th>Flug</th><th>Herkunft</th><th>Plan</th><th>Erwartet</th><th>T</th>
+    </tr></thead>
+    <tbody>
+    {% for i in range(wp, 0, -1) %}
+    <tr class="past">
+      <td><span class="badge bp">⬆ gelandet</span></td>
+      <td><b>{{ state_attr(s,'past_'~i~'_number') or '—' }}</b></td>
+      <td>{{ state_attr(s,'past_'~i~'_origin') or '—' }}</td>
+      <td class="tn">{{ state_attr(s,'past_'~i~'_planned') or '—' }}</td>
+      <td class="tn">{{ state_attr(s,'past_'~i~'_expected') or '—' }}</td>
+      <td>{{ state_attr(s,'past_'~i~'_terminal') or '—' }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="sep"><td colspan="6">── jetzt ──</td></tr>
+    {% for i in range(1, wf + 1) %}
+    {% set num = state_attr(s,'future_'~i~'_number') or '—' %}
+    {% set org = state_attr(s,'future_'~i~'_origin') or '—' %}
+    {% set pl  = state_attr(s,'future_'~i~'_planned') or '—' %}
+    {% set ex  = state_attr(s,'future_'~i~'_expected') %}
+    {% set trm = state_attr(s,'future_'~i~'_terminal') or '—' %}
+    {% if i == 1 %}
+    <tr class="next">
+      <td><span class="badge bn">▶ nächste</span></td>
+      <td><b>{{ num }}</b></td>
+      <td>{{ org }}</td>
+      <td class="tn">{{ pl }}</td>
+      <td class="tn">{{ ex or '—' }}{% if ex and ex != pl %}<span class="warn">▲</span>{% endif %}</td>
+      <td>{{ trm }}</td>
+    </tr>
+    {% else %}
+    <tr class="future">
+      <td><span class="badge bf">{{ i }}. folgt</span></td>
+      <td><b>{{ num }}</b></td>
+      <td>{{ org }}</td>
+      <td class="tn">{{ pl }}</td>
+      <td class="tn">{{ ex or '—' }}</td>
+      <td>{{ trm }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
