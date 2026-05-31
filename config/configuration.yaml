@@ -4,7 +4,7 @@ logger:
   default: warning
   logs:
     custom_components.airport_hamburg: debug
-lovelace:
+llovelace:
   resources:
-    - url: https://cdn.jsdelivr.net/gh/custom-cards/flex-table-card@master/flex-table-card.js
+    - url: /local/flex-table-card/flex-table-card.js
       type: module
