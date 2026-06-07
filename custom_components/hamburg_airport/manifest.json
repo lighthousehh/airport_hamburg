@@ -1,7 +1,7 @@
 {
   "domain": "hamburg_airport",
   "name": "Hamburg Airport",
-  "version": "2.0.0",
+  "version": "0.2.1",
   "requirements": [],
   "dependencies": [],
   "codeowners": [],
