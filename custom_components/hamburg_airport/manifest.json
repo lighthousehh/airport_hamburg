@@ -6,7 +6,7 @@
   "issue_tracker": "https://github.com/DEIN_USERNAME/hamburg_airport/issues",
   "requirements": [],
   "dependencies": [],
-  "codeowners": [@lighthousehh],
+  "codeowners": ["@lighthousehh"],
   "iot_class": "cloud_polling",
   "config_flow": true
 }
