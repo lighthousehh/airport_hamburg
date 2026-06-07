@@ -2,9 +2,11 @@
   "domain": "hamburg_airport",
   "name": "Hamburg Airport",
   "version": "0.9.0",
+  "documentation": "https://github.com/DEIN_USERNAME/hamburg_airport",
+  "issue_tracker": "https://github.com/DEIN_USERNAME/hamburg_airport/issues",
   "requirements": [],
   "dependencies": [],
-  "codeowners": [],
+  "codeowners": [@lighthousehh],
   "iot_class": "cloud_polling",
   "config_flow": true
 }
