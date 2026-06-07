@@ -22,8 +22,8 @@
         "title": "Hamburg Airport Options",
         "data": {
           "scan_interval": "Update interval (minutes)",
-          "past_count": "Number of past arrivals to show (0–10)",
-          "future_count": "Number of upcoming arrivals to show (1–10)"
+          "past_count": "Number of past flights to show (0–10)",
+          "future_count": "Number of upcoming flights to show (1–10)"
         }
       }
     }

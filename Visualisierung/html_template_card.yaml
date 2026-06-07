@@ -1,65 +1,176 @@
 type: custom:html-template-card
 ignore_line_breaks: true
 content: |
-  {% set s = 'sensor.hamburg_airport_landungen_zeitfenster' %}
-  {% set wp = state_attr(s, 'window_past') | int(0) %}
-  {% set wf = state_attr(s, 'window_future') | int(0) %}
+  {% set dep = 'sensor.hamburg_airport_abfluge_zeitfenster' %}
+  {% set arr = 'sensor.hamburg_airport_landungen_zeitfenster' %}
+  {% set dep_wp = state_attr(dep, 'window_past') | int(0) %}
+  {% set dep_wf = state_attr(dep, 'window_future') | int(0) %}
+  {% set arr_wp = state_attr(arr, 'window_past') | int(0) %}
+  {% set arr_wf = state_attr(arr, 'window_future') | int(0) %}
   <style>
-    .ham { width:100%; border-collapse:collapse; font-size:.9em; font-family: var(--primary-font-family); }
-    .ham th { font-size:.7em; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--secondary-text-color); padding:4px 10px 8px; border-bottom:2px solid var(--divider-color); text-align:left; }
-    .ham td { padding:8px 10px; vertical-align:middle; }
-    .ham .past td { opacity:.4; border-bottom:1px solid var(--divider-color); }
-    .ham .sep td { text-align:center; font-size:.7em; color:var(--secondary-text-color); letter-spacing:.15em; padding:3px 0; background:var(--secondary-background-color); }
-    .ham .next td { font-weight:700; border-top:2px solid var(--success-color,#4caf50); border-bottom:2px solid var(--success-color,#4caf50); background:color-mix(in srgb,var(--success-color,#4caf50) 8%,transparent); }
-    .ham .future td { opacity:.75; border-bottom:1px solid var(--divider-color); }
-    .badge { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.75em; font-weight:700; white-space:nowrap; }
-    .bp { background:var(--divider-color); color:var(--secondary-text-color); }
-    .bn { background:var(--success-color,#4caf50); color:#fff; }
-    .bf { background:var(--primary-color); color:#fff; }
-    .tn { font-variant-numeric:tabular-nums; }
-    .warn { color:var(--warning-color,#ff9800); margin-left:3px; font-size:.8em; }
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+    .ap { background:#0d0d0d; border-radius:12px; overflow:hidden; font-family:'Share Tech Mono',monospace; }
+    #ap-radio-dep, #ap-radio-arr { display:none; }
+    .ap-tabs { display:flex; background:#111; border-bottom:2px solid #1e1e1e; }
+    .ap-tab { flex:1; padding:12px 0; text-align:center; font-size:.8em; letter-spacing:.18em; text-transform:uppercase; color:#555; cursor:pointer; transition:all .2s; border-bottom:3px solid transparent; margin-bottom:-2px; display:block; }
+    #ap-radio-dep:checked ~ .ap .ap-tabs label[for="ap-radio-dep"] { color:#f5a800; border-bottom-color:#f5a800; }
+    #ap-radio-arr:checked ~ .ap .ap-tabs label[for="ap-radio-arr"] { color:#38bdf8; border-bottom-color:#38bdf8; }
+    .ap-pane { display:none; }
+    #ap-radio-dep:checked ~ .ap #pane-dep { display:block; }
+    #ap-radio-arr:checked ~ .ap #pane-arr { display:block; }
+    .ap-hero { padding:16px 18px; border-bottom:1px solid #1e1e1e; display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+    .dep-hero { background:linear-gradient(135deg,#111 50%,#1e1600); }
+    .arr-hero { background:linear-gradient(135deg,#111 50%,#001e2e); }
+    .hero-label { font-size:.6em; letter-spacing:.25em; text-transform:uppercase; opacity:.6; margin-bottom:3px; }
+    .dep-hero .hero-label, .dep-hero .hero-iata, .dep-hero .hero-flight, .dep-hero .hero-time-lbl, .dep-hero .hero-time { color:#f5a800; }
+    .arr-hero .hero-label, .arr-hero .hero-iata, .arr-hero .hero-flight, .arr-hero .hero-time-lbl, .arr-hero .hero-time { color:#38bdf8; }
+    .hero-dest { color:#fff; font-size:1.55em; font-weight:700; }
+    .hero-iata { font-size:.8em; opacity:.5; margin-left:6px; }
+    .hero-flight { font-size:.9em; margin-top:3px; opacity:.8; }
+    .hero-right { text-align:right; }
+    .hero-time-lbl { font-size:.58em; letter-spacing:.2em; opacity:.55; }
+    .hero-time { font-size:2em; font-weight:700; line-height:1.1; }
+    .hero-delay { color:#f87171; font-size:.82em; margin-top:2px; }
+    .hero-trm { display:inline-block; margin-top:7px; padding:3px 10px; border-radius:4px; font-size:.72em; font-weight:700; letter-spacing:.1em; }
+    .dep-hero .hero-trm { background:#f5a800; color:#000; }
+    .arr-hero .hero-trm { background:#38bdf8; color:#000; }
+    table.apt { width:100%; border-collapse:collapse; }
+    .apt th { background:#111; font-size:.62em; letter-spacing:.16em; text-transform:uppercase; padding:7px 13px; border-bottom:1px solid #1e1e1e; text-align:left; }
+    #pane-dep .apt th { color:#f5a800; }
+    #pane-arr .apt th { color:#38bdf8; }
+    .apt td { padding:9px 13px; font-size:.88em; border-bottom:1px solid #1a1a1a; vertical-align:middle; color:#e0e0e0; }
+    .apt tr:last-child td { border-bottom:none; }
+    /* VERGANGENE – gut lesbar mit leicht abgedunkeltem Hintergrund */
+    .apt tr.r-past { background:#0f0f0f; }
+    .apt tr.r-past td { color:#999; border-bottom:1px solid #161616; }
+    .apt tr.r-past .fn { color:#bbb; }
+    .apt tr.r-sep td { text-align:center; font-size:.62em; letter-spacing:.28em; padding:4px 0; background:#0a0a0a; color:#333; border:none !important; }
+    /* NÄCHSTER FLUG */
+    #pane-dep .apt tr.r-next td { background:#0f0f00; border-top:1px solid #f5a80055; border-bottom:1px solid #f5a80055; color:#f5a800; }
+    #pane-arr .apt tr.r-next td { background:#001020; border-top:1px solid #38bdf855; border-bottom:1px solid #38bdf855; color:#38bdf8; }
+    /* KOMMENDE */
+    .apt tr.r-future td { color:#e0e0e0; }
+    .apt tr.r-future { background:#0d0d0d; }
+    .apt tr.r-future:hover { background:#131313; }
+    /* BADGES */
+    .sb { display:inline-block; padding:2px 9px; border-radius:4px; font-size:.68em; letter-spacing:.08em; font-weight:700; white-space:nowrap; }
+    .sb-gone     { background:#1e1e1e; color:#777; border:1px solid #2a2a2a; }
+    .sb-delayed  { background:#450a0a; color:#f87171; }
+    .sb-boarding { background:#f5a800; color:#000; }
+    .sb-next-arr { background:#38bdf8; color:#000; }
+    .sb-soon     { background:#1c1c00; color:#f5a800; border:1px solid #f5a80033; }
+    .sb-soon-arr { background:#001c2e; color:#38bdf8; border:1px solid #38bdf833; }
+    .fn { font-weight:600; color:#fff; }
+    .r-past .fn { color:#bbb; }
+    #pane-dep .r-next .fn { color:#f5a800; }
+    #pane-arr .r-next .fn { color:#38bdf8; }
+    .iata-s { font-size:.72em; opacity:.5; margin-left:3px; color:#888; }
+    .delay-s { color:#f87171; font-size:.78em; margin-left:3px; }
+    .trm-c { text-align:center; font-weight:700; color:#ccc; }
+    #pane-dep .r-next .trm-c { color:#f5a800; }
+    #pane-arr .r-next .trm-c { color:#38bdf8; }
   </style>
-  <table class="ham">
-    <thead><tr>
-      <th>Status</th><th>Flug</th><th>Herkunft</th><th>Plan</th><th>Erwartet</th><th>T</th>
-    </tr></thead>
-    <tbody>
-    {% for i in range(wp, 0, -1) %}
-    <tr class="past">
-      <td><span class="badge bp">⬆ gelandet</span></td>
-      <td><b>{{ state_attr(s,'past_'~i~'_number') or '—' }}</b></td>
-      <td>{{ state_attr(s,'past_'~i~'_origin') or '—' }}</td>
-      <td class="tn">{{ state_attr(s,'past_'~i~'_planned') or '—' }}</td>
-      <td class="tn">{{ state_attr(s,'past_'~i~'_expected') or '—' }}</td>
-      <td>{{ state_attr(s,'past_'~i~'_terminal') or '—' }}</td>
-    </tr>
-    {% endfor %}
-    <tr class="sep"><td colspan="6">── jetzt ──</td></tr>
-    {% for i in range(1, wf + 1) %}
-    {% set num = state_attr(s,'future_'~i~'_number') or '—' %}
-    {% set org = state_attr(s,'future_'~i~'_origin') or '—' %}
-    {% set pl  = state_attr(s,'future_'~i~'_planned') or '—' %}
-    {% set ex  = state_attr(s,'future_'~i~'_expected') %}
-    {% set trm = state_attr(s,'future_'~i~'_terminal') or '—' %}
-    {% if i == 1 %}
-    <tr class="next">
-      <td><span class="badge bn">▶ nächste</span></td>
-      <td><b>{{ num }}</b></td>
-      <td>{{ org }}</td>
-      <td class="tn">{{ pl }}</td>
-      <td class="tn">{{ ex or '—' }}{% if ex and ex != pl %}<span class="warn">▲</span>{% endif %}</td>
-      <td>{{ trm }}</td>
-    </tr>
-    {% else %}
-    <tr class="future">
-      <td><span class="badge bf">{{ i }}. folgt</span></td>
-      <td><b>{{ num }}</b></td>
-      <td>{{ org }}</td>
-      <td class="tn">{{ pl }}</td>
-      <td class="tn">{{ ex or '—' }}</td>
-      <td>{{ trm }}</td>
-    </tr>
-    {% endif %}
-    {% endfor %}
-    </tbody>
-  </table>
+
+  <input type="radio" id="ap-radio-dep" name="ap-tab" checked>
+  <input type="radio" id="ap-radio-arr" name="ap-tab">
+
+  <div class="ap">
+    <div class="ap-tabs">
+      <label for="ap-radio-dep" class="ap-tab">✈ Abflüge ({{ dep_wp + dep_wf }})</label>
+      <label for="ap-radio-arr" class="ap-tab">✈ Landungen ({{ arr_wp + arr_wf }})</label>
+    </div>
+
+    <div class="ap-pane" id="pane-dep">
+      {% if dep_wf > 0 %}
+      <div class="ap-hero dep-hero">
+        <div>
+          <div class="hero-label">Nächster Abflug</div>
+          <div class="hero-dest">{{ state_attr(dep,'future_1_destination_name') or '—' }}<span class="hero-iata">{{ state_attr(dep,'future_1_destination_iata') or '' }}</span></div>
+          <div class="hero-flight">{{ state_attr(dep,'future_1_flight_number') or '—' }}</div>
+        </div>
+        <div class="hero-right">
+          <div class="hero-time-lbl">Abflug</div>
+          <div class="hero-time">{{ state_attr(dep,'future_1_planned_time') or '—' }}</div>
+          {% set hex = state_attr(dep,'future_1_expected_time') %}
+          {% if hex not in [none,'null',''] and hex != state_attr(dep,'future_1_planned_time') %}<div class="hero-delay">⚠ {{ hex }}</div>{% endif %}
+          <div class="hero-trm">Terminal {{ state_attr(dep,'future_1_terminal') or '—' }}</div>
+        </div>
+      </div>
+      {% endif %}
+      <table class="apt"><thead><tr>
+        <th style="width:110px">Status</th><th>Flug</th><th style="width:99999px">Ziel</th><th>Plan</th><th>Erwartet</th><th style="text-align:center">T</th>
+      </tr></thead><tbody>
+      {% for i in range(dep_wp, 0, -1) %}
+      <tr class="r-past">
+        <td><span class="sb sb-gone">DEPARTED</span></td>
+        <td class="fn">{{ state_attr(dep,'past_'~i~'_flight_number') or '—' }}</td>
+        <td>{{ state_attr(dep,'past_'~i~'_destination_name') or '—' }}<span class="iata-s">{{ state_attr(dep,'past_'~i~'_destination_iata') or '' }}</span></td>
+        <td>{{ state_attr(dep,'past_'~i~'_planned_time') or '—' }}</td>
+        <td>{% set ex2 = state_attr(dep,'past_'~i~'_expected_time') %}{{ ex2 if ex2 not in [none,'null',''] else '—' }}</td>
+        <td class="trm-c">{{ state_attr(dep,'past_'~i~'_terminal') or '—' }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="r-sep"><td colspan="6">· · · · · · · · · · · · · · · ·</td></tr>
+      {% for i in range(1, dep_wf + 1) %}
+      {% set ex2 = state_attr(dep,'future_'~i~'_expected_time') %}
+      {% set pl2 = state_attr(dep,'future_'~i~'_planned_time') or '—' %}
+      {% set delayed = ex2 not in [none,'null',''] and ex2 != pl2 %}
+      <tr class="{{ 'r-next' if i == 1 else 'r-future' }}">
+        <td>{% if i == 1 %}{% if delayed %}<span class="sb sb-delayed">⚠ VERSPÄTET</span>{% else %}<span class="sb sb-boarding">▶ BOARDING</span>{% endif %}{% else %}{% if delayed %}<span class="sb sb-delayed">⚠ DELAY</span>{% else %}<span class="sb sb-soon">{{ i }}. FOLGT</span>{% endif %}{% endif %}</td>
+        <td class="fn">{{ state_attr(dep,'future_'~i~'_flight_number') or '—' }}</td>
+        <td>{{ state_attr(dep,'future_'~i~'_destination_name') or '—' }}<span class="iata-s">{{ state_attr(dep,'future_'~i~'_destination_iata') or '' }}</span></td>
+        <td>{{ pl2 }}</td>
+        <td>{% if ex2 not in [none,'null',''] %}{{ ex2 }}{% if delayed %}<span class="delay-s">▲</span>{% endif %}{% else %}—{% endif %}</td>
+        <td class="trm-c">{{ state_attr(dep,'future_'~i~'_terminal') or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody></table>
+    </div>
+
+    <div class="ap-pane" id="pane-arr">
+      {% if arr_wf > 0 %}
+      <div class="ap-hero arr-hero">
+        <div>
+          <div class="hero-label">Nächste Landung</div>
+          <div class="hero-dest">{{ state_attr(arr,'future_1_origin_name') or '—' }}<span class="hero-iata">{{ state_attr(arr,'future_1_origin_iata') or '' }}</span></div>
+          <div class="hero-flight">{{ state_attr(arr,'future_1_flight_number') or '—' }}</div>
+        </div>
+        <div class="hero-right">
+          <div class="hero-time-lbl">Ankunft</div>
+          <div class="hero-time">{{ state_attr(arr,'future_1_planned_time') or '—' }}</div>
+          {% set hex = state_attr(arr,'future_1_expected_time') %}
+          {% if hex not in [none,'null',''] and hex != state_attr(arr,'future_1_planned_time') %}<div class="hero-delay">⚠ {{ hex }}</div>{% endif %}
+          <div class="hero-trm">Terminal {{ state_attr(arr,'future_1_terminal') or '—' }}</div>
+        </div>
+      </div>
+      {% endif %}
+      <table class="apt"><thead><tr>
+        <th style="width:110px">Status</th><th>Flug</th><th style="width:99999px">Herkunft</th><th>Plan</th><th>Erwartet</th><th style="text-align:center">T</th>
+      </tr></thead><tbody>
+      {% for i in range(arr_wp, 0, -1) %}
+      <tr class="r-past">
+        <td><span class="sb sb-gone">GELANDET</span></td>
+        <td class="fn">{{ state_attr(arr,'past_'~i~'_flight_number') or '—' }}</td>
+        <td>{{ state_attr(arr,'past_'~i~'_origin_name') or '—' }}<span class="iata-s">{{ state_attr(arr,'past_'~i~'_origin_iata') or '' }}</span></td>
+        <td>{{ state_attr(arr,'past_'~i~'_planned_time') or '—' }}</td>
+        <td>{% set ex2 = state_attr(arr,'past_'~i~'_expected_time') %}{{ ex2 if ex2 not in [none,'null',''] else '—' }}</td>
+        <td class="trm-c">{{ state_attr(arr,'past_'~i~'_terminal') or '—' }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="r-sep"><td colspan="6">· · · · · · · · · · · · · · · ·</td></tr>
+      {% for i in range(1, arr_wf + 1) %}
+      {% set ex2 = state_attr(arr,'future_'~i~'_expected_time') %}
+      {% set pl2 = state_attr(arr,'future_'~i~'_planned_time') or '—' %}
+      {% set delayed = ex2 not in [none,'null',''] and ex2 != pl2 %}
+      <tr class="{{ 'r-next' if i == 1 else 'r-future' }}">
+        <td>{% if i == 1 %}{% if delayed %}<span class="sb sb-delayed">⚠ VERSPÄTET</span>{% else %}<span class="sb sb-next-arr">▶ ERWARTET</span>{% endif %}{% else %}{% if delayed %}<span class="sb sb-delayed">⚠ DELAY</span>{% else %}<span class="sb sb-soon-arr">{{ i }}. FOLGT</span>{% endif %}{% endif %}</td>
+        <td class="fn">{{ state_attr(arr,'future_'~i~'_flight_number') or '—' }}</td>
+        <td>{{ state_attr(arr,'future_'~i~'_origin_name') or '—' }}<span class="iata-s">{{ state_attr(arr,'future_'~i~'_origin_iata') or '' }}</span></td>
+        <td>{{ pl2 }}</td>
+        <td>{% if ex2 not in [none,'null',''] %}{{ ex2 }}{% if delayed %}<span class="delay-s">▲</span>{% endif %}{% else %}—{% endif %}</td>
+        <td class="trm-c">{{ state_attr(arr,'future_'~i~'_terminal') or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody></table>
+    </div>
+  </div>
